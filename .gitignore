@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Logs
+*.log
+.migrate.log
+.reset.log
+npm-debug.log*
+
+# Cache
+.cache/
+.eslintcache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+*.tmp
+tmp/

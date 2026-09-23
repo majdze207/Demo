@@ -1,0 +1,48 @@
+{
+  "name": "crypto-mlm-casino-frontend",
+  "version": "1.0.0",
+  "description": "Crypto MLM + Casino Platform — Web Interface",
+  "private": true,
+  "author": "majdze207",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf .next node_modules/.cache",
+    "fresh": "rm -rf node_modules package-lock.json .next && npm install"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.51.1",
+    "axios": "^1.7.2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.408.0",
+    "next": "^15.5.25",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.4.0",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3"
+  },
+  "keywords": [
+    "nextjs",
+    "react",
+    "casino",
+    "crypto",
+    "web3",
+    "tailwindcss"
+  ]
+}
