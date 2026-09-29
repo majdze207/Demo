@@ -1,6 +1,6 @@
 // =========================================================================
 //  frontend.tsx — COMPLETE FINAL FRONTEND
-//  Full UI with progressive jackpot pools, betting wheel, no fairness UI
+//  Full UI with jackpot pools, betting wheel, admin controls
 // =========================================================================
 'use client';
 
@@ -14,10 +14,10 @@ import {
   Sparkles, Clock, Trophy, Dices, TrendingUp, TrendingDown, Gift,
   Copy, CheckCircle2, XCircle, AlertCircle, Loader2, LayoutDashboard,
   Users, Wallet, ArrowDownToLine, Ticket, User, LogOut, Menu, X,
-  Shield, Bell, ArrowRight, ShieldCheck, RefreshCw, Award, Calendar,
-  Mail, Target, Flame, Zap, ExternalLink, Activity, Settings,
+  Shield, Bell, ArrowRight, RefreshCw, Award, Calendar,
+  Mail, Target, Flame, Zap, Activity, Settings,
   DollarSign, Ban, PlayCircle, BarChart3, FileText, Home,
-  Gamepad2, Coins, History, Plus, Minus, Trash2,
+  Gamepad2, Coins, History, Plus, Minus, Trash2, Edit3,
 } from 'lucide-react';
 import clsx, { ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -35,8 +35,10 @@ const pkgLabel = (p: string) =>
   (({ none: 'No Package', p1_5: 'Starter $5', p2_10: 'Bronze $10',
       p3_20: 'Silver $20', p4_50: 'Gold $50' } as any)[p] || p);
 const gameLabel = (g: string) =>
-  (({ dice: 'Dice', mystery_box: 'Mystery Box', prediction: 'Prediction',
-      bonus_wheel: 'Bonus Wheel' } as any)[g] || g);
+  (({ dice: 'Dice', mystery_box: 'Mystery Box', bonus_wheel: 'Bonus Wheel' } as any)[g] || g);
+
+// ⚠️ Admin secret path
+const ADMIN_PATH = '/ctrl-panel-9x4k7';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const api = axios.create({ baseURL: API_URL, timeout: 20_000 });
@@ -347,19 +349,18 @@ export const DemoToggle = () => {
 //  SECTION 7: LAYOUT
 // =========================================================================
 const NAV = [
-  { href: '/dashboard',   label: 'Dashboard',     icon: LayoutDashboard },
-  { href: '/referrals',   label: 'Referrals',     icon: Users },
-  { href: '/wallet',      label: 'Wallet',        icon: Wallet },
-  { href: '/withdraw',    label: 'Withdraw',      icon: ArrowDownToLine },
-  { href: '/dice',        label: 'Dice',          icon: Dices },
-  { href: '/boxes',       label: 'Mystery Box',   icon: Gift },
-  { href: '/prediction',  label: 'Prediction',    icon: TrendingUp },
+  { href: '/dashboard',   label: 'Dashboard',      icon: LayoutDashboard },
+  { href: '/referrals',   label: 'Referrals',      icon: Users },
+  { href: '/wallet',      label: 'Wallet',         icon: Wallet },
+  { href: '/withdraw',    label: 'Withdraw',       icon: ArrowDownToLine },
+  { href: '/dice',        label: 'Dice',           icon: Dices },
+  { href: '/boxes',       label: 'Mystery Box',    icon: Gift },
   { href: '/lottery',     label: 'Weekly Lottery', icon: Ticket },
-  { href: '/bonus',       label: 'Bonus Wheel',   icon: Sparkles },
+  { href: '/bonus',       label: 'Bonus Wheel',    icon: Sparkles },
   { href: '/missions',    label: 'Daily Missions', icon: Target },
-  { href: '/history',     label: 'Bet History',   icon: History },
-  { href: '/faq',         label: 'Help & FAQ',    icon: FileText },
-  { href: '/profile',     label: 'Profile',       icon: User },
+  { href: '/history',     label: 'Bet History',    icon: History },
+  { href: '/faq',         label: 'Help & FAQ',     icon: FileText },
+  { href: '/profile',     label: 'Profile',        icon: User },
 ];
 
 export const Sidebar = () => {
@@ -388,8 +389,10 @@ export const Sidebar = () => {
         })}
       </nav>
       {user?.email === 'admin@cryptoplay.io' && (
-        <Link href="/admin" className="mx-3 mb-3 flex items-center gap-3 px-3 py-2.5
-                                       rounded-lg text-sm bg-red-500/10 text-red-400">
+        <Link href={ADMIN_PATH}
+          onClick={() => setOpen(false)}
+          className="mx-3 mb-3 flex items-center gap-3 px-3 py-2.5
+                     rounded-lg text-sm bg-red-500/10 text-red-400 hover:bg-red-500/20">
           <Shield className="w-4 h-4" /> Admin Panel
         </Link>
       )}
@@ -616,12 +619,12 @@ export const LiveWinnersFeed = () => {
 // =========================================================================
 export const LandingPage = () => {
   const features = [
-    { icon: Sparkles,    title: 'Premium Games',    desc: 'Dice, Mystery Boxes, Price Prediction, Bonus Wheel and more.' },
-    { icon: PlayCircle,  title: 'Demo Mode',        desc: 'Practice with 1,000 free DEMO USDT. Zero risk, full feature set.' },
-    { icon: Trophy,      title: 'Referral Rewards', desc: 'Earn up to 18% L1 + 5% L2 + activity bonus on every referral.' },
+    { icon: Sparkles,    title: 'Premium Games',    desc: 'Dice, Mystery Boxes, Bonus Wheel and more.' },
+    { icon: PlayCircle,  title: 'Demo Mode',        desc: 'Practice with 1,000 free DEMO USDT. Zero risk.' },
+    { icon: Trophy,      title: 'Referral Rewards', desc: 'Earn up to 18% L1 + 5% L2 + activity bonus.' },
     { icon: Ticket,      title: 'Weekly Lottery',   desc: '5 USDT tickets. Winner takes 85% of the pool.' },
     { icon: Target,      title: 'Daily Missions',   desc: 'Complete tasks, earn USDT and XP rewards.' },
-    { icon: TrendingUp,  title: 'Live Prediction',  desc: 'UP/DOWN on BNB, BTC, ETH — settled by Binance prices.' },
+    { icon: TrendingUp,  title: 'Jackpot Pools',    desc: 'Progressive pools growing with every bet.' },
   ];
   return (
     <div className="min-h-screen bg-gradient-to-b from-surface-900 to-surface-800">
@@ -892,7 +895,6 @@ export const BetHistoryPage = () => {
               <option value="">All Games</option>
               <option value="dice">Dice</option>
               <option value="mystery_box">Mystery Box</option>
-              <option value="prediction">Prediction</option>
               <option value="bonus_wheel">Bonus Wheel</option>
             </select>
           </div>
@@ -978,7 +980,7 @@ export const BetHistoryPage = () => {
 };
 
 // =========================================================================
-//  SECTION 12: DICE GAME — with Jackpot Pool
+//  SECTION 12: DICE GAME
 // =========================================================================
 export const DiceGame = () => {
   const user = useAuthStore((s) => s.user)!;
@@ -1139,7 +1141,7 @@ export const DiceGame = () => {
               </p>
             </div>
             <p className="text-xs text-white/50 leading-relaxed">
-              A portion of every bet goes into the pool. Win the jackpot to claim it all!
+              A portion of every bet goes into the pool.
             </p>
           </Card>
           {lastResult && (
@@ -1165,7 +1167,7 @@ const Row = ({ k, v }: any) => (
 );
 
 // =========================================================================
-//  SECTION 13: BOXES — with Jackpot Pool
+//  SECTION 13: BOXES
 // =========================================================================
 export const BoxesPage = () => {
   const user = useAuthStore((s) => s.user)!;
@@ -1294,148 +1296,7 @@ export const BoxesPage = () => {
 };
 
 // =========================================================================
-//  SECTION 14: PREDICTION
-// =========================================================================
-export const PredictionPage = () => {
-  const user = useAuthStore((s) => s.user)!;
-  const setUser = useAuthStore((s) => s.setUser);
-  const { push } = useToast();
-  const qc = useQueryClient();
-  const [selected, setSelected] = useState<any>(null);
-  const [side, setSide] = useState<'up'|'down'>('up');
-  const [amount, setAmount] = useState(1);
-  const [idKey, setIdKey] = useState(idemKey());
-
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['markets'],
-    queryFn: async () => (await api.get('/prediction/markets')).data.markets || [],
-    refetchInterval: 5_000,
-  });
-
-  const betMutation = useMutation({
-    mutationFn: async () => (await api.post(`/prediction/markets/${selected.id}/bet`,
-      { side, amount }, { headers: { 'Idempotency-Key': idKey } })).data,
-    onSuccess: () => {
-      push('success', `Bet ${side.toUpperCase()} ${fmtUsdt(amount)}`);
-      setUser({ ...user, balance: user.balance - amount });
-      setSelected(null); setIdKey(idemKey());
-      qc.invalidateQueries({ queryKey: ['markets'] });
-    },
-    onError: (err) => { push('error', extractError(err)); setIdKey(idemKey()); },
-  });
-
-  if (isLoading) return <Spinner />;
-  return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-bold mb-1">Price Prediction</h1>
-          <p className="text-white/50">Live markets from Binance public prices.</p>
-        </div>
-        <Button variant="secondary" size="sm" onClick={() => refetch()}>Refresh</Button>
-      </div>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {data?.map((m: any) => (
-          <MarketCard key={m.id} market={m}
-            onBet={(s: any) => { setSide(s); setSelected(m); setAmount(1); }} />
-        ))}
-        {data?.length === 0 && (
-          <p className="text-white/40 col-span-full text-center py-12">No open markets.</p>
-        )}
-      </div>
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="Place Prediction">
-        {selected && (
-          <div className="space-y-4">
-            <div className="bg-surface-900 rounded-lg p-3 text-sm space-y-1">
-              <div className="flex justify-between">
-                <span className="text-white/50">Symbol</span><span>{selected.symbol}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-white/50">Open Price</span>
-                <span className="font-mono">${selected.open_price.toFixed(2)}</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setSide('up')}
-                className={cn('p-4 rounded-xl border-2 transition',
-                  side === 'up' ? 'border-emerald-500 bg-emerald-500/10' : 'border-surface-700')}>
-                <TrendingUp className={cn('w-6 h-6 mx-auto mb-2',
-                  side === 'up' ? 'text-emerald-400' : 'text-white/40')} />
-                <p className="font-semibold">UP</p>
-              </button>
-              <button onClick={() => setSide('down')}
-                className={cn('p-4 rounded-xl border-2 transition',
-                  side === 'down' ? 'border-red-500 bg-red-500/10' : 'border-surface-700')}>
-                <TrendingDown className={cn('w-6 h-6 mx-auto mb-2',
-                  side === 'down' ? 'text-red-400' : 'text-white/40')} />
-                <p className="font-semibold">DOWN</p>
-              </button>
-            </div>
-            <Input type="number" label="Amount (USDT)" value={amount}
-              onChange={(e: any) => setAmount(Number(e.target.value))} />
-            <Button fullWidth size="lg" loading={betMutation.isPending}
-              disabled={user.balance < amount}
-              onClick={() => betMutation.mutate()}>
-              Confirm {side.toUpperCase()}
-            </Button>
-          </div>
-        )}
-      </Modal>
-    </div>
-  );
-};
-const MarketCard = ({ market, onBet }: any) => {
-  const [sec, setSec] = useState(() =>
-    Math.max(0, Math.floor((new Date(market.closes_at).getTime() - Date.now()) / 1000)));
-  useEffect(() => {
-    const t = setInterval(() => setSec(Math.max(0,
-      Math.floor((new Date(market.closes_at).getTime() - Date.now()) / 1000))), 1000);
-    return () => clearInterval(t);
-  }, [market.closes_at]);
-  const m = String(Math.floor(sec / 60)).padStart(2, '0');
-  const s = String(sec % 60).padStart(2, '0');
-  const total = Number(market.total_up) + Number(market.total_down);
-  const upPct = total > 0 ? (Number(market.total_up) / total) * 100 : 50;
-  return (
-    <Card>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold">{market.symbol}</span>
-          <span className="text-xs text-white/40">{market.duration_seconds}s</span>
-        </div>
-        <div className={cn('flex items-center gap-1 text-xs',
-          sec < 30 ? 'text-red-400' : 'text-white/40')}>
-          <Clock className="w-3 h-3" /> {m}:{s}
-        </div>
-      </div>
-      <div className="mb-4">
-        <p className="text-xs text-white/40 mb-1">Open Price</p>
-        <p className="text-2xl font-bold font-mono">${market.open_price.toFixed(2)}</p>
-      </div>
-      <div className="flex rounded-full overflow-hidden h-2 bg-surface-900 mb-4">
-        <div className="bg-emerald-500" style={{ width: `${upPct}%` }} />
-        <div className="bg-red-500 flex-1" />
-      </div>
-      <div className="flex justify-between text-xs mb-4">
-        <span className="text-emerald-400">UP {fmtUsdt(market.total_up)}</span>
-        <span className="text-red-400">DOWN {fmtUsdt(market.total_down)}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Button size="sm" onClick={() => onBet('up')}
-          className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-none">
-          <TrendingUp className="w-4 h-4" /> UP
-        </Button>
-        <Button size="sm" onClick={() => onBet('down')}
-          className="bg-red-500 hover:bg-red-600 text-white shadow-none">
-          <TrendingDown className="w-4 h-4" /> DOWN
-        </Button>
-      </div>
-    </Card>
-  );
-};
-
-// =========================================================================
-//  SECTION 15: LOTTERY
+//  SECTION 14: LOTTERY
 // =========================================================================
 export const LotteryPage = () => {
   const user = useAuthStore((s) => s.user)!;
@@ -1550,7 +1411,7 @@ export const LotteryPage = () => {
 };
 
 // =========================================================================
-//  SECTION 16: MISSIONS
+//  SECTION 15: MISSIONS
 // =========================================================================
 export const MissionsPage = () => {
   const { push } = useToast();
@@ -1648,7 +1509,7 @@ export const MissionsPage = () => {
 };
 
 // =========================================================================
-//  SECTION 17: REFERRALS
+//  SECTION 16: REFERRALS
 // =========================================================================
 export const ReferralsPage = () => {
   const user = useAuthStore((s) => s.user)!;
@@ -1745,7 +1606,7 @@ const RefTable = ({ rows }: { rows: any[] }) => {
 };
 
 // =========================================================================
-//  SECTION 18: WALLET
+//  SECTION 17: WALLET — uses live admin wallet
 // =========================================================================
 const PACKAGES = [
   { id: 'p1_5',  price: 5,  l1: 8,  l2: 5, act: 2.5 },
@@ -1761,7 +1622,13 @@ export const WalletPage = () => {
   const [selectedPkg, setSelectedPkg] = useState<string | null>(null);
   const [txHash, setTxHash] = useState('');
   const [idKey, setIdKey] = useState(idemKey());
-  const [adminWallet] = useState('0x0000000000000000000000000000000000000000');
+
+  const { data: depositCfg } = useQuery({
+    queryKey: ['public-settings'],
+    queryFn: async () => (await api.get('/public/settings')).data,
+    refetchInterval: 60_000,
+  });
+  const adminWallet = depositCfg?.admin_wallet?.address || '0x0000000000000000000000000000000000000000';
 
   const { data: deposits } = useQuery({
     queryKey: ['deposit-history'],
@@ -1880,7 +1747,7 @@ export const WalletPage = () => {
 };
 
 // =========================================================================
-//  SECTION 19: WITHDRAW
+//  SECTION 18: WITHDRAW
 // =========================================================================
 export const WithdrawPage = () => {
   const user = useAuthStore((s) => s.user)!;
@@ -2012,7 +1879,12 @@ const ReqRow = ({ ok, label, detail }: any) => (
 );
 
 // =========================================================================
-//  SECTION 20: BONUS WHEEL — with betting + jackpot pool
+//  END OF PART 1
+//  PART 2 (Sections 19-24) يبدأ من BonusWheelPage + Profile + FAQ + Admin
+// =========================================================================
+
+// =========================================================================
+//  SECTION 19: BONUS WHEEL — with betting + jackpot pool
 // =========================================================================
 export const BonusWheelPage = () => {
   const user = useAuthStore((s) => s.user)!;
@@ -2235,7 +2107,7 @@ export const BonusWheelPage = () => {
 };
 
 // =========================================================================
-//  SECTION 21: PROFILE
+//  SECTION 20: PROFILE
 // =========================================================================
 export const ProfilePage = () => {
   const user = useAuthStore((s) => s.user)!;
@@ -2305,7 +2177,7 @@ const StatBox = ({ label, value, accent }: any) => (
 );
 
 // =========================================================================
-//  SECTION 22: FAQ
+//  SECTION 21: FAQ
 // =========================================================================
 export const FAQPage = () => {
   const { data, isLoading } = useQuery({
@@ -2364,10 +2236,10 @@ export const FAQPage = () => {
 };
 
 // =========================================================================
-//  SECTION 23: ADMIN PANEL
+//  SECTION 22: ADMIN PANEL
 // =========================================================================
 export const AdminPage = () => {
-  const [tab, setTab] = useState<'overview'|'users'|'withdrawals'|'settings'|'lottery'|'pools'|'audit'>('overview');
+  const [tab, setTab] = useState<'overview'|'users'|'deposits'|'withdrawals'|'settings'|'lottery'|'pools'|'audit'>('overview');
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => (await api.get('/admin/stats')).data.stats,
@@ -2380,7 +2252,7 @@ export const AdminPage = () => {
         <h1 className="text-3xl font-bold">Admin Panel</h1>
       </div>
       <div className="flex gap-2 border-b border-surface-700 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-        {(['overview','users','withdrawals','settings','lottery','pools','audit'] as const).map((t) => (
+        {(['overview','users','deposits','withdrawals','settings','lottery','pools','audit'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={cn('px-4 py-2 text-sm font-medium capitalize border-b-2 transition whitespace-nowrap',
               tab === t ? 'border-brand-500 text-brand-500'
@@ -2391,6 +2263,7 @@ export const AdminPage = () => {
       </div>
       {tab === 'overview' && <AdminOverview stats={stats} isLoading={isLoading} />}
       {tab === 'users' && <AdminUsers />}
+      {tab === 'deposits' && <AdminDeposits />}
       {tab === 'withdrawals' && <AdminWithdrawals />}
       {tab === 'settings' && <AdminSettings />}
       {tab === 'lottery' && <AdminLottery />}
@@ -2412,10 +2285,11 @@ const AdminOverview = ({ stats, isLoading }: any) => {
       sub: `${stats.demo?.count ?? 0} demo bets`, icon: PlayCircle },
     { label: 'Deposits', value: fmtUsdt(stats.wallets?.total_deposited ?? 0), sub: 'Lifetime', icon: DollarSign },
     { label: 'Pending W/D', value: stats.pending_withdrawals ?? 0, sub: 'Awaiting review', icon: Clock },
+    { label: 'Pending Deposits', value: stats.pending_deposits ?? 0, sub: 'Awaiting approval', icon: AlertCircle },
   ];
   return (
     <div className="space-y-6">
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {cards.map((c: any, i: number) => (
           <Card key={i}>
             <c.icon className="w-5 h-5 text-white/40 mb-3" />
@@ -2425,6 +2299,24 @@ const AdminOverview = ({ stats, isLoading }: any) => {
           </Card>
         ))}
       </div>
+
+      {stats.pools?.length > 0 && (
+        <Card>
+          <CardTitle sub="Progressive jackpot pools across all games.">Jackpot Pools</CardTitle>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {stats.pools.map((p: any) => (
+              <div key={p.game} className="bg-surface-700/40 rounded-lg p-4 text-center">
+                <p className="text-xs text-white/40 uppercase tracking-wider mb-1">{p.game}</p>
+                <p className="text-2xl font-bold text-brand-500">{fmtUsdt(p.current_pool)}</p>
+                <p className="text-xs text-white/40 mt-1">
+                  Contributed: {fmtUsdt(p.total_contributed)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>
           <CardTitle>Top Winners</CardTitle>
@@ -2473,6 +2365,7 @@ const AdminOverview = ({ stats, isLoading }: any) => {
           </div>
         </Card>
       </div>
+
       <Card>
         <CardTitle>Daily GGR (Last 30 days)</CardTitle>
         <div className="space-y-1.5 max-h-72 overflow-y-auto">
@@ -2615,6 +2508,114 @@ const AdminUsers = () => {
   );
 };
 
+// ---------- ADMIN DEPOSITS ----------
+const AdminDeposits = () => {
+  const { push } = useToast();
+  const qc = useQueryClient();
+  const [status, setStatus] = useState('confirming');
+  const [selected, setSelected] = useState<any>(null);
+  const [reason, setReason] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-deposits', status],
+    queryFn: async () => (await api.get(`/admin/deposits?status=${status}`)).data.deposits,
+    refetchInterval: 15_000,
+  });
+
+  const approve = useMutation({
+    mutationFn: async (id: string) => (await api.post(`/admin/deposits/${id}/approve`)).data,
+    onSuccess: () => {
+      push('success', 'Deposit approved');
+      qc.invalidateQueries({ queryKey: ['admin-deposits'] });
+      qc.invalidateQueries({ queryKey: ['admin-stats'] });
+    },
+    onError: (e) => push('error', extractError(e)),
+  });
+
+  const reject = useMutation({
+    mutationFn: async ({ id, reason }: any) =>
+      (await api.post(`/admin/deposits/${id}/reject`, { reason })).data,
+    onSuccess: () => {
+      push('success', 'Deposit rejected');
+      setSelected(null); setReason('');
+      qc.invalidateQueries({ queryKey: ['admin-deposits'] });
+      qc.invalidateQueries({ queryKey: ['admin-stats'] });
+    },
+    onError: (e) => push('error', extractError(e)),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 flex-wrap">
+        {['confirming','confirmed','rejected','pending'].map((s) => (
+          <button key={s} onClick={() => setStatus(s)}
+            className={cn('px-4 py-2 rounded-lg text-sm capitalize',
+              status === s ? 'bg-brand-500 text-surface-900 font-semibold'
+                           : 'bg-surface-700 hover:bg-surface-600')}>
+            {s}
+          </button>
+        ))}
+      </div>
+      {isLoading ? <Spinner /> : (
+        <div className="space-y-2">
+          {!data?.length && (
+            <p className="text-sm text-white/40 text-center py-6">No deposits in this category.</p>
+          )}
+          {data?.map((d: any) => (
+            <Card key={d.id}>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-lg">{fmtUsdt(d.amount_usdt)}</p>
+                  <p className="text-xs text-white/40 truncate">
+                    {d.email} · {fmtDate(d.created_at)}
+                  </p>
+                  <p className="text-xs text-white/40 font-mono truncate mt-1">
+                    TX: {d.tx_hash}
+                  </p>
+                  <p className="text-xs text-white/40">
+                    Confirmations: {d.confirmations}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <Badge color={d.status === 'confirmed' ? 'green'
+                    : d.status === 'rejected' ? 'red' : 'brand'}>{d.status}</Badge>
+                  {(d.status === 'confirming' || d.status === 'pending') && (
+                    <>
+                      <Button size="sm" variant="success"
+                        loading={approve.isPending && approve.variables === d.id}
+                        onClick={() => approve.mutate(d.id)}>
+                        <CheckCircle2 className="w-3 h-3" /> Approve
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => setSelected(d)}>
+                        <XCircle className="w-3 h-3" /> Reject
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+      <Modal open={!!selected} onClose={() => setSelected(null)} title="Reject Deposit">
+        {selected && (
+          <div className="space-y-4">
+            <p className="text-sm">Amount: <b>{fmtUsdt(selected.amount_usdt)}</b></p>
+            <p className="text-xs text-white/40 truncate">From: {selected.email}</p>
+            <Input label="Reason (optional)" value={reason}
+              onChange={(e: any) => setReason(e.target.value)} />
+            <Button variant="danger" fullWidth loading={reject.isPending}
+              onClick={() => reject.mutate({ id: selected.id, reason })}>
+              Confirm Reject
+            </Button>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+// ---------- ADMIN WITHDRAWALS ----------
 const AdminWithdrawals = () => {
   const { push } = useToast();
   const qc = useQueryClient();
@@ -2711,15 +2712,25 @@ const AdminWithdrawals = () => {
   );
 };
 
+// ---------- ADMIN SETTINGS (Comprehensive) ----------
 const AdminSettings = () => {
   const { push } = useToast();
   const qc = useQueryClient();
+
+  // ─── Deposit Wallet ───
+  const [wallet, setWallet] = useState('');
+  // ─── Referral Rates ───
+  const [rates, setRates] = useState<any>({});
+  // ─── Per-Game Edges ───
+  const [gameTab, setGameTab] = useState<'dice'|'boxes'|'wheel'>('dice');
+  const [edgeForm, setEdgeForm] = useState<any>({});
+  const [limitForm, setLimitForm] = useState<any>({});
+  // ─── Raw JSON ───
   const [editing, setEditing] = useState<any>(null);
   const [value, setValue] = useState('');
-  const [gameTab, setGameTab] = useState<'dice'|'boxes'|'wheel'|'prediction'>('dice');
-  const [edgeForm, setEdgeForm] = useState<any>({});
 
-  const { data, isLoading } = useQuery({
+  // ─── Queries ───
+  const { data: settings, isLoading } = useQuery({
     queryKey: ['admin-settings'],
     queryFn: async () => (await api.get('/admin/settings')).data.settings,
   });
@@ -2729,17 +2740,40 @@ const AdminSettings = () => {
     queryFn: async () => (await api.get(`/admin/games/${gameTab}/config`)).data,
   });
 
+  // ─── Populate initial values ───
   useEffect(() => {
-    if (gameCfg?.edges) setEdgeForm({ ...gameCfg.edges });
+    if (settings) {
+      const walletCfg = settings.find((s: any) => s.key === 'admin_wallet');
+      if (walletCfg) setWallet(walletCfg.value.address || '');
+      const ratesCfg = settings.find((s: any) => s.key === 'package_rates');
+      if (ratesCfg) setRates(ratesCfg.value || {});
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    if (gameCfg) {
+      if (gameCfg.edges) setEdgeForm({ ...gameCfg.edges });
+      if (gameCfg.limit) setLimitForm({ ...gameCfg.limit });
+    }
   }, [gameCfg]);
 
-  const saveSetting = useMutation({
-    mutationFn: async () => {
-      const parsed = JSON.parse(value);
-      return (await api.put(`/admin/settings/${editing.key}`, { value: parsed })).data;
-    },
+  // ─── Mutations ───
+  const saveWallet = useMutation({
+    mutationFn: async () => (await api.put('/admin/wallet/set', {
+      address: wallet, chain_id: 56,
+    })).data,
     onSuccess: () => {
-      push('success', 'Saved'); setEditing(null);
+      push('success', 'Deposit wallet updated');
+      qc.invalidateQueries({ queryKey: ['admin-settings'] });
+      qc.invalidateQueries({ queryKey: ['public-settings'] });
+    },
+    onError: (e) => push('error', extractError(e)),
+  });
+
+  const saveRates = useMutation({
+    mutationFn: async () => (await api.put('/admin/referral-rates/set', { rates })).data,
+    onSuccess: () => {
+      push('success', 'Referral rates updated');
       qc.invalidateQueries({ queryKey: ['admin-settings'] });
     },
     onError: (e) => push('error', extractError(e)),
@@ -2766,8 +2800,11 @@ const AdminSettings = () => {
   });
 
   const saveLimits = useMutation({
-    mutationFn: async (limits: any) =>
-      (await api.put(`/admin/games/${gameTab}/limits`, limits)).data,
+    mutationFn: async () => (await api.put(`/admin/games/${gameTab}/limits`, {
+      min_bet: Number(limitForm.min_bet),
+      max_bet: Number(limitForm.max_bet),
+      jackpot_pct: Number(limitForm.jackpot_pct),
+    })).data,
     onSuccess: () => {
       push('success', 'Limits updated');
       refetchGame();
@@ -2775,20 +2812,90 @@ const AdminSettings = () => {
     onError: (e) => push('error', extractError(e)),
   });
 
+  const saveSetting = useMutation({
+    mutationFn: async () => {
+      const parsed = JSON.parse(value);
+      return (await api.put(`/admin/settings/${editing.key}`, { value: parsed })).data;
+    },
+    onSuccess: () => {
+      push('success', 'Saved'); setEditing(null);
+      qc.invalidateQueries({ queryKey: ['admin-settings'] });
+    },
+    onError: (e) => push('error', extractError(e)),
+  });
+
   if (isLoading) return <Spinner />;
-  const games = data?.find((s: any) => s.key === 'games_enabled')?.value || {};
-  const pkgs = ['none','p1_5','p2_10','p3_20','p4_50'];
+  const games = settings?.find((s: any) => s.key === 'games_enabled')?.value || {};
+  const pkgs = ['p1_5', 'p2_10', 'p3_20', 'p4_50'];
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardTitle sub="Instantly enable/disable games platform-wide.">Kill Switches</CardTitle>
+    <div className="space-y-6">
+
+      {/* ═══ 1. Deposit Wallet ═══ */}
+      <Card className="border-brand-500/40">
+        <CardTitle sub="Wallet address that receives USDT (BEP-20) deposits for package purchases.">
+          💰 Deposit Wallet (BEP-20)
+        </CardTitle>
+        <div className="space-y-3">
+          <Input label="BEP-20 Address" value={wallet}
+            onChange={(e: any) => setWallet(e.target.value)}
+            placeholder="0x..." />
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-xs text-yellow-300">
+            ⚠️ This address is used by all users for deposits. Double-check it.
+          </div>
+          <Button loading={saveWallet.isPending}
+            onClick={() => saveWallet.mutate()}
+            disabled={!wallet || wallet.length < 40}>
+            Save Wallet Address
+          </Button>
+        </div>
+      </Card>
+
+      {/* ═══ 2. Referral Rates ═══ */}
+      <Card className="border-emerald-500/40">
+        <CardTitle sub="Commission rates per package (use decimals: 0.10 = 10%).">
+          🤝 Referral Commission Rates
+        </CardTitle>
+        <div className="space-y-3">
+          {pkgs.map((pkg) => {
+            const r = rates[pkg] || { price: 0, l1: 0, l2: 0, activity: 0 };
+            return (
+              <div key={pkg} className="bg-surface-700/40 rounded-lg p-3">
+                <p className="font-semibold text-sm mb-2">{pkgLabel(pkg)}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <Input label="L1 Rate" type="number" step="0.01"
+                    value={r.l1} onChange={(e: any) =>
+                      setRates({ ...rates, [pkg]: { ...r, l1: parseFloat(e.target.value) || 0 } })} />
+                  <Input label="L2 Rate" type="number" step="0.01"
+                    value={r.l2} onChange={(e: any) =>
+                      setRates({ ...rates, [pkg]: { ...r, l2: parseFloat(e.target.value) || 0 } })} />
+                  <Input label="Activity" type="number" step="0.01"
+                    value={r.activity} onChange={(e: any) =>
+                      setRates({ ...rates, [pkg]: { ...r, activity: parseFloat(e.target.value) || 0 } })} />
+                  <Input label="Price ($)" type="number"
+                    value={r.price} onChange={(e: any) =>
+                      setRates({ ...rates, [pkg]: { ...r, price: parseFloat(e.target.value) || 0 } })} />
+                </div>
+              </div>
+            );
+          })}
+          <Button loading={saveRates.isPending} onClick={() => saveRates.mutate()}>
+            Save Referral Rates
+          </Button>
+        </div>
+      </Card>
+
+      {/* ═══ 3. Kill Switches ═══ */}
+      <Card className="border-red-500/40">
+        <CardTitle sub="Instantly enable/disable games platform-wide.">
+          🔴 Kill Switches
+        </CardTitle>
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
           {Object.entries(games).map(([k, v]: any) => (
             <button key={k} onClick={() => toggleGame.mutate(k)}
               className={cn('flex items-center justify-between p-3 rounded-lg border transition',
-                v ? 'bg-emerald-500/10 border-emerald-500/40'
-                  : 'bg-red-500/10 border-red-500/40')}>
+                v ? 'bg-emerald-500/10 border-emerald-500/40 hover:bg-emerald-500/20'
+                  : 'bg-red-500/10 border-red-500/40 hover:bg-red-500/20')}>
               <span className="capitalize text-sm">{k.replace('_',' ')}</span>
               <Badge color={v ? 'green' : 'red'}>{v ? 'ON' : 'OFF'}</Badge>
             </button>
@@ -2796,10 +2903,13 @@ const AdminSettings = () => {
         </div>
       </Card>
 
-      <Card>
-        <CardTitle sub="Adjust house edge per game per package.">Per-Game House Edge</CardTitle>
+      {/* ═══ 4. Per-Game House Edge ═══ */}
+      <Card className="border-blue-500/40">
+        <CardTitle sub="Adjust house edge per game per package.">
+          🎮 Per-Game House Edge
+        </CardTitle>
         <div className="flex gap-2 mb-4 flex-wrap">
-          {(['dice','boxes','wheel','prediction'] as const).map((g) => (
+          {(['dice','boxes','wheel'] as const).map((g) => (
             <button key={g} onClick={() => setGameTab(g)}
               className={cn('px-3 py-1.5 rounded text-sm capitalize',
                 gameTab === g ? 'bg-brand-500 text-surface-900 font-semibold'
@@ -2808,8 +2918,8 @@ const AdminSettings = () => {
             </button>
           ))}
         </div>
-        <div className="space-y-2">
-          {pkgs.map((pkg) => (
+        <div className="space-y-2 mb-4">
+          {['none','p1_5','p2_10','p3_20','p4_50'].map((pkg) => (
             <div key={pkg} className="flex items-center gap-3 bg-surface-700/40 rounded-lg p-3">
               <span className="text-sm flex-1">{pkgLabel(pkg)}</span>
               <input type="number" step="0.01" min="0" max="1"
@@ -2824,36 +2934,52 @@ const AdminSettings = () => {
           ))}
         </div>
         {gameCfg?.limit && (
-          <div className="mt-4 pt-4 border-t border-surface-700 space-y-2">
-            <p className="text-sm text-white/60">Bet limits & jackpot contribution</p>
+          <div className="mt-4 pt-4 border-t border-surface-700 space-y-3">
+            <p className="text-sm text-white/60 font-medium">Bet Limits & Jackpot</p>
             <div className="grid grid-cols-3 gap-2">
-              <Input type="number" label="Min Bet" defaultValue={gameCfg.limit.min_bet}
-                onBlur={(e: any) => saveLimits.mutate({ min_bet: parseFloat(e.target.value) })} />
-              <Input type="number" label="Max Bet" defaultValue={gameCfg.limit.max_bet}
-                onBlur={(e: any) => saveLimits.mutate({ max_bet: parseFloat(e.target.value) })} />
-              <Input type="number" step="0.01" label="Jackpot %" defaultValue={gameCfg.limit.jackpot_pct}
-                onBlur={(e: any) => saveLimits.mutate({ jackpot_pct: parseFloat(e.target.value) })} />
+              <Input type="number" step="0.1" label="Min Bet ($)"
+                value={limitForm.min_bet ?? ''}
+                onChange={(e: any) => setLimitForm({ ...limitForm, min_bet: e.target.value })} />
+              <Input type="number" step="1" label="Max Bet ($)"
+                value={limitForm.max_bet ?? ''}
+                onChange={(e: any) => setLimitForm({ ...limitForm, max_bet: e.target.value })} />
+              <Input type="number" step="0.01" label="Jackpot %"
+                value={limitForm.jackpot_pct ?? ''}
+                onChange={(e: any) => setLimitForm({ ...limitForm, jackpot_pct: e.target.value })} />
             </div>
+            <Button loading={saveLimits.isPending} onClick={() => saveLimits.mutate()}>
+              Save Limits
+            </Button>
           </div>
         )}
       </Card>
 
-      {data?.filter((s: any) => s.key !== 'games_enabled' && s.key !== 'per_game_edge').map((s: any) => (
-        <Card key={s.key}>
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="font-mono text-sm text-brand-500">{s.key}</p>
-              <pre className="text-xs text-white/50 mt-1 overflow-x-auto max-w-full">
-                {JSON.stringify(s.value)}
+      {/* ═══ 5. Raw JSON Settings ═══ */}
+      <Card>
+        <CardTitle sub="Advanced: edit raw JSON settings (bonus_wheel, streak_rewards, etc.)">
+          ⚙️ Advanced Settings
+        </CardTitle>
+        <div className="space-y-2">
+          {settings?.filter((s: any) =>
+            !['admin_wallet','package_rates','per_game_edge','games_enabled'].includes(s.key)
+          ).map((s: any) => (
+            <details key={s.key} className="bg-surface-700/40 rounded-lg p-3">
+              <summary className="cursor-pointer text-sm font-mono text-brand-500 flex items-center justify-between">
+                <span>{s.key}</span>
+                <Edit3 className="w-3 h-3 text-white/40" />
+              </summary>
+              <pre className="text-xs text-white/60 mt-2 overflow-x-auto max-h-40">
+                {JSON.stringify(s.value, null, 2)}
               </pre>
-            </div>
-            <Button size="sm" variant="secondary"
-              onClick={() => { setEditing(s); setValue(JSON.stringify(s.value, null, 2)); }}>
-              <Settings className="w-3 h-3" /> Edit
-            </Button>
-          </div>
-        </Card>
-      ))}
+              <Button size="sm" variant="secondary" className="mt-2"
+                onClick={() => { setEditing(s); setValue(JSON.stringify(s.value, null, 2)); }}>
+                Edit JSON
+              </Button>
+            </details>
+          ))}
+        </div>
+      </Card>
+
       <Modal open={!!editing} onClose={() => setEditing(null)}
              title={`Edit: ${editing?.key}`} size="lg">
         <div className="space-y-4">
@@ -2861,13 +2987,14 @@ const AdminSettings = () => {
             className="w-full bg-surface-900 border border-surface-700 rounded-lg p-3
                        text-white font-mono text-xs h-64 focus:outline-none focus:border-brand-500" />
           <Button fullWidth loading={saveSetting.isPending}
-            onClick={() => saveSetting.mutate()}>Save</Button>
+            onClick={() => saveSetting.mutate()}>Save JSON</Button>
         </div>
       </Modal>
     </div>
   );
 };
 
+// ---------- ADMIN POOLS ----------
 const AdminPools = () => {
   const { push } = useToast();
   const qc = useQueryClient();
@@ -2921,6 +3048,7 @@ const AdminPools = () => {
   );
 };
 
+// ---------- ADMIN LOTTERY ----------
 const AdminLottery = () => {
   const { push } = useToast();
   const qc = useQueryClient();
@@ -3007,6 +3135,7 @@ const AdminLottery = () => {
   );
 };
 
+// ---------- ADMIN AUDIT ----------
 const AdminAudit = () => {
   const [page, setPage] = useState(1);
   const [action, setAction] = useState('');
@@ -3073,7 +3202,7 @@ const AdminAudit = () => {
 };
 
 // =========================================================================
-//  SECTION 24: PROVIDERS + EXPORTS
+//  SECTION 23: PROVIDERS + EXPORTS
 // =========================================================================
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1, staleTime: 30_000 } },
