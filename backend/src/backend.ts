@@ -1,7 +1,7 @@
 // =========================================================================
 //  backend.ts — COMPLETE FINAL SERVER
 //  Full production backend with progressive jackpots, per-game edges,
-//  betting bonus wheel, admin lottery control, and all core features
+//  betting bonus wheel, admin deposit control, wallet/referral settings
 // =========================================================================
 import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
@@ -416,7 +416,6 @@ const applyDailyStreak = async (c: PoolClient, userId: string) => {
   const today = new Date().toISOString().slice(0, 10);
   const last = u.last_login_date ? new Date(u.last_login_date).toISOString().slice(0, 10) : null;
 
-  // منع إعادة الفحص إذا مر أقل من 24 ساعة
   if (last === today) return { applied: false, streak_count: u.streak_count, reward: 0 };
 
   const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
@@ -693,7 +692,7 @@ const getOrCreateSeed = async (c: PoolClient, uid: string) => {
 };
 
 // =========================================================================
-//  SECTION 13: DICE (Real + Demo) — with jackpot contribution
+//  SECTION 13: DICE (Real + Demo)
 // =========================================================================
 const rollDice = async (p: {
   userId: string; betAmount: number; target: number;
@@ -788,7 +787,7 @@ const rollDice = async (p: {
 };
 
 // =========================================================================
-//  SECTION 14: MYSTERY BOXES (Real + Demo) — with jackpot contribution
+//  SECTION 14: MYSTERY BOXES (Real + Demo)
 // =========================================================================
 const openBox = async (userId: string, boxId: string, isDemo: boolean) => withTransaction(async (c) => {
   const games = await getGamesEnabled();
@@ -885,7 +884,7 @@ const openBox = async (userId: string, boxId: string, isDemo: boolean) => withTr
 });
 
 // =========================================================================
-//  SECTION 15: PREDICTION
+//  SECTION 15: PREDICTION (kept for future)
 // =========================================================================
 const fetchBinancePrice = async (symbol: string): Promise<number> => {
   const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${symbol}`);
@@ -1092,7 +1091,6 @@ const spinWheel = async (userId: string, betAmount: number, useFreeSpin: boolean
     [userId, idx, prize, txId]);
 
   if (isDemo && !useFreeSpin) {
-    // Demo mode: update demo_balance directly
     const newDemoBal = Number(u.demo_balance) - betAmount + prize;
     if (newDemoBal < 0) throw Object.assign(new Error('INSUFFICIENT_DEMO_BALANCE'), { status: 400 });
     await c.query(`UPDATE users SET demo_balance=$1 WHERE id=$2`, [newDemoBal, userId]);
@@ -1220,7 +1218,7 @@ const cancelWithdraw = async (userId: string, txId: string) => {
 };
 
 // =========================================================================
-//  SECTION 18: DEPOSITS
+//  SECTION 18: DEPOSITS (Admin approval required)
 // =========================================================================
 const createDepositIntent = async (userId: string, txHash: string) => {
   return withTransaction(async (c) => {
@@ -1240,29 +1238,19 @@ const createDepositIntent = async (userId: string, txHash: string) => {
       return { ...r.rows[0], status: 'rejected', error_reason: v.reason };
     }
     const d = v.details!;
-    const newStatus = v.isFinal ? 'confirmed' : 'confirming';
+
+    // ⚠️ IMPORTANT: Do NOT auto-confirm. Wait for admin approval.
     await c.query(
       `UPDATE deposits
          SET from_address=$1, to_address=$2, amount_usdt=$3, confirmations=$4,
-             block_number=$5, status=$6, confirmed_at=$7, raw_meta=$8
-       WHERE id=$9`,
-      [d.from, d.to, d.amount, d.confirmations, d.blockNumber, newStatus,
-       v.isFinal ? new Date() : null, JSON.stringify(d), r.rows[0].id]);
+             block_number=$5, status='confirming', raw_meta=$6
+       WHERE id=$7`,
+      [d.from, d.to, d.amount, d.confirmations, d.blockNumber, JSON.stringify(d), r.rows[0].id]);
 
-    if (v.isFinal) {
-      await c.query(
-        `INSERT INTO transactions
-           (user_id,type,amount_usdt,status,tx_hash,from_address,to_address,meta,is_demo)
-         VALUES ($1,'deposit',$2,'confirmed',$3,$4,$5,$6,FALSE)
-         ON CONFLICT (tx_hash) DO NOTHING`,
-        [userId, d.amount, txHash, d.from, d.to,
-         JSON.stringify({ blockNumber: d.blockNumber, confirmations: d.confirmations,
-                          source: 'deposit_intent' })]);
-      await c.query(
-        `INSERT INTO notifications (user_id,title,body,type,category)
-         VALUES ($1,'Deposit Confirmed',$2,'success','deposit')`,
-        [userId, `${d.amount} USDT credited to your account.`]);
-    }
+    await c.query(
+      `INSERT INTO notifications (user_id,title,body,type,category)
+       VALUES ($1,'Deposit Pending Review',$2,'info','deposit')`,
+      [userId, `${d.amount} USDT awaiting admin approval.`]);
 
     const fresh = await c.query('SELECT * FROM deposits WHERE id=$1', [r.rows[0].id]);
     return fresh.rows[0];
@@ -1272,34 +1260,18 @@ const createDepositIntent = async (userId: string, txHash: string) => {
 const refreshPendingDeposits = async () => {
   const r = await query(
     `SELECT id,user_id,tx_hash FROM deposits
-     WHERE status IN ('pending','confirming') LIMIT 30`);
+     WHERE status = 'confirming' LIMIT 30`);
   for (const d of r.rows) {
     try {
       const v = await verifyUsdtPayment(d.tx_hash);
       if (!v.success) continue;
       const det = v.details!;
-      const newStatus = v.isFinal ? 'confirmed' : 'confirming';
       await query(
         `UPDATE deposits
-           SET amount_usdt=$1, confirmations=$2, block_number=$3, status=$4,
-               confirmed_at=$5, from_address=$6, to_address=$7
-         WHERE id=$8`,
-        [det.amount, det.confirmations, det.blockNumber, newStatus,
-         v.isFinal ? new Date() : null, det.from, det.to, d.id]);
-
-      if (v.isFinal) {
-        await query(
-          `INSERT INTO transactions
-             (user_id,type,amount_usdt,status,tx_hash,from_address,to_address,meta,is_demo)
-           VALUES ($1,'deposit',$2,'confirmed',$3,$4,$5,$6,FALSE)
-           ON CONFLICT (tx_hash) DO NOTHING`,
-          [d.user_id, det.amount, d.tx_hash, det.from, det.to,
-           JSON.stringify({ confirmations: det.confirmations, source: 'deposit_refresh' })]);
-        await query(
-          `INSERT INTO notifications (user_id,title,body,type,category)
-           VALUES ($1,'Deposit Confirmed',$2,'success','deposit')`,
-          [d.user_id, `${det.amount} USDT credited.`]);
-      }
+           SET amount_usdt=$1, confirmations=$2, block_number=$3,
+               from_address=$4, to_address=$5
+         WHERE id=$6`,
+        [det.amount, det.confirmations, det.blockNumber, det.from, det.to, d.id]);
     } catch (e) { logger.error({ e, depositId: d.id }, 'refresh deposit failed'); }
   }
   return r.rowCount;
@@ -1436,6 +1408,12 @@ const drawWeeklyLottery = async (roundId: string) => {
   });
 };
 
+// =========================================================
+//  END OF PART 1
+//  PART 2 يبدأ بـ SECTION 20 — EXPRESS APP
+// =========================================================
+
+
 // =========================================================================
 //  SECTION 20: EXPRESS APP
 // =========================================================================
@@ -1536,6 +1514,14 @@ R.get('/pools/:game', readLimit, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// ---------- PUBLIC SETTINGS (wallet address only) ----------
+R.get('/public/settings', readLimit, async (_req, res, next) => {
+  try {
+    const wallet = await getSetting('admin_wallet');
+    res.json({ success: true, admin_wallet: wallet });
+  } catch (e) { next(e); }
+});
+
 // ---------- PROVABLY FAIR (backend only) ----------
 R.get('/fair/seed', authMiddleware, async (req, res, next) => {
   try {
@@ -1607,14 +1593,31 @@ R.post('/payment/purchase-package', authMiddleware, sensitiveLimit, idempotency(
   async (req, res, next) => {
     try {
       const { txHash, package: pkg } = req.body;
-      const v = await verifyUsdtPayment(txHash);
-      if (!v.success) return res.status(400).json({ success: false, error: v.reason });
-      if (!v.isFinal) return res.status(202).json({ success: false, error: 'AWAITING_CONFIRMATIONS' });
+
+      // TEST_MODE for development
+      const TEST_MODE = process.env.TEST_MODE === 'true';
+      let verifiedAmount: number;
+      let verifiedFrom: string;
+
+      if (TEST_MODE) {
+        const rates = await getPackageRates();
+        const cfg = rates[pkg];
+        if (!cfg) return res.status(400).json({ success: false, error: 'INVALID_PACKAGE' });
+        verifiedAmount = cfg.price;
+        verifiedFrom = '0x0000000000000000000000000000000000000000';
+      } else {
+        const v = await verifyUsdtPayment(txHash);
+        if (!v.success) return res.status(400).json({ success: false, error: v.reason });
+        if (!v.isFinal) return res.status(202).json({ success: false, error: 'AWAITING_CONFIRMATIONS' });
+        verifiedAmount = Number(v.details!.amount);
+        verifiedFrom = v.details!.from;
+      }
+
       const result = await activatePackage({
         userId: (req as any).user.id, package: pkg, txHash,
-        fromAddress: v.details!.from, amount: Number(v.details!.amount),
+        fromAddress: verifiedFrom, amount: verifiedAmount,
       });
-      res.json({ success: true, ...result });
+      res.json({ success: true, ...result, testMode: TEST_MODE });
     } catch (e: any) { if (e.status) return res.status(e.status).json({ success: false, error: e.message }); next(e); }
   });
 
@@ -1674,9 +1677,11 @@ R.post('/boxes/:id/open', authMiddleware, betLimit, idempotency('box-open'), asy
   } catch (e: any) { if (e.status) return res.status(e.status).json({ success: false, error: e.message }); next(e); }
 });
 
-// ---------- PREDICTION ----------
+// ---------- PREDICTION (kept, disabled by default via games_enabled) ----------
 R.get('/prediction/markets', readLimit, async (_req, res, next) => {
   try {
+    const games = await getGamesEnabled();
+    if (!games.prediction) return res.json({ success: true, markets: [] });
     const r = await query(
       `SELECT id,symbol,duration_seconds,open_price,closes_at,
               total_up,total_down,status
@@ -2003,7 +2008,7 @@ R.get('/lottery/my-tickets', authMiddleware, paginationGuard(100, 50), async (re
 // =========================================================================
 R.get('/admin/stats', authMiddleware, adminMiddleware, adminLimit, async (_req, res, next) => {
   try {
-    const [users, wallets, subs, bets, ggrTotal, ggrDaily, wheelCost, pendingWd, topWinners, topLosers, demoStats] = await Promise.all([
+    const [users, wallets, subs, bets, ggrTotal, ggrDaily, wheelCost, pendingWd, pendingDep, topWinners, topLosers, demoStats] = await Promise.all([
       query(`SELECT COUNT(*)::int total,
                     COUNT(*) FILTER (WHERE status='active')::int active,
                     COUNT(*) FILTER (WHERE status='banned')::int banned FROM users`),
@@ -2025,6 +2030,7 @@ R.get('/admin/stats', authMiddleware, adminMiddleware, adminLimit, async (_req, 
       query(`SELECT COALESCE(SUM(prize_amount),0) total FROM bonus_wheel_spins`),
       query(`SELECT COUNT(*)::int count FROM transactions
              WHERE type='withdrawal' AND status='pending'`),
+      query(`SELECT COUNT(*)::int count FROM deposits WHERE status='confirming'`),
       query(`SELECT u.id,u.username,u.email,
                     COALESCE(SUM(cb.payout - cb.bet_amount),0) AS net_profit
              FROM casino_bets cb JOIN users u ON u.id=cb.user_id
@@ -2054,6 +2060,7 @@ R.get('/admin/stats', authMiddleware, adminMiddleware, adminLimit, async (_req, 
         ggr_daily: Number(ggrDaily.rows[0].ggr),
         wheel_cost_total: Number(wheelCost.rows[0].total),
         pending_withdrawals: pendingWd.rows[0].count,
+        pending_deposits: pendingDep.rows[0].count,
         top_winners: topWinners.rows, top_losers: topLosers.rows,
         demo: demoStats.rows[0],
         daily_ggr: dailyGgr.rows,
@@ -2123,6 +2130,90 @@ R.post('/admin/users/:id/balance', authMiddleware, adminMiddleware, async (req, 
   } catch (e) { next(e); }
 });
 
+// ---------- ADMIN: DEPOSITS ----------
+R.get('/admin/deposits', authMiddleware, adminMiddleware, paginationGuard(100, 50), async (req, res, next) => {
+  try {
+    const { limit, offset } = (req as any).pagination;
+    const status = (req.query.status as string) || 'confirming';
+    const r = await query(
+      `SELECT d.*, u.email, u.username, u.balance
+       FROM deposits d JOIN users u ON u.id=d.user_id
+       WHERE ($1 = '' OR d.status=$1::deposit_status)
+       ORDER BY d.created_at DESC LIMIT $2 OFFSET $3`,
+      [status, limit, offset]);
+    res.json({ success: true, deposits: r.rows });
+  } catch (e) { next(e); }
+});
+
+R.post('/admin/deposits/:id/approve', authMiddleware, adminMiddleware, async (req, res, next) => {
+  try {
+    const result = await withTransaction(async (c) => {
+      const d = await c.query(`SELECT * FROM deposits WHERE id=$1 FOR UPDATE`, [req.params.id]);
+      if (!d.rowCount) throw Object.assign(new Error('NOT_FOUND'), { status: 404 });
+      const dep = d.rows[0];
+      if (dep.status === 'confirmed') throw Object.assign(new Error('ALREADY_CONFIRMED'), { status: 400 });
+
+      await c.query(
+        `UPDATE deposits SET status='confirmed', confirmed_at=NOW() WHERE id=$1`,
+        [req.params.id]);
+
+      await c.query(
+        `INSERT INTO transactions
+           (user_id,type,amount_usdt,status,tx_hash,from_address,to_address,meta,is_demo)
+         VALUES ($1,'deposit',$2,'confirmed',$3,$4,$5,$6,FALSE)
+         ON CONFLICT (tx_hash) DO NOTHING`,
+        [dep.user_id, dep.amount_usdt, dep.tx_hash, dep.from_address, dep.to_address,
+         JSON.stringify({ approved_by_admin: (req as any).user.id, deposit_id: dep.id })]);
+
+      await c.query(
+        `INSERT INTO notifications (user_id,title,body,type,category)
+         VALUES ($1,'Deposit Confirmed',$2,'success','deposit')`,
+        [dep.user_id, `${dep.amount_usdt} USDT credited to your account.`]);
+
+      return { confirmed: true, amount: dep.amount_usdt };
+    });
+
+    await writeAudit({
+      adminId: (req as any).user.id, adminEmail: (req as any).user.email,
+      action: 'deposit.approve', targetType: 'deposit', targetId: req.params.id,
+      before: null, after: result, ip: req.ip, ua: req.header('user-agent') || '',
+    });
+
+    res.json({ success: true, ...result });
+  } catch (e: any) { if (e.status) return res.status(e.status).json({ success: false, error: e.message }); next(e); }
+});
+
+R.post('/admin/deposits/:id/reject', authMiddleware, adminMiddleware, async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    const result = await withTransaction(async (c) => {
+      const d = await c.query(`SELECT * FROM deposits WHERE id=$1 FOR UPDATE`, [req.params.id]);
+      if (!d.rowCount) throw Object.assign(new Error('NOT_FOUND'), { status: 404 });
+      const dep = d.rows[0];
+
+      await c.query(
+        `UPDATE deposits SET status='rejected', error_reason=$1 WHERE id=$2`,
+        [reason || 'Rejected by admin', req.params.id]);
+
+      await c.query(
+        `INSERT INTO notifications (user_id,title,body,type,category)
+         VALUES ($1,'Deposit Rejected',$2,'warning','deposit')`,
+        [dep.user_id, `Reason: ${reason || 'contact support'}`]);
+
+      return { rejected: true };
+    });
+
+    await writeAudit({
+      adminId: (req as any).user.id, adminEmail: (req as any).user.email,
+      action: 'deposit.reject', targetType: 'deposit', targetId: req.params.id,
+      before: null, after: result, ip: req.ip, ua: req.header('user-agent') || '',
+    });
+
+    res.json({ success: true, ...result });
+  } catch (e: any) { if (e.status) return res.status(e.status).json({ success: false, error: e.message }); next(e); }
+});
+
+// ---------- ADMIN: WITHDRAWALS ----------
 R.get('/admin/withdrawals', authMiddleware, adminMiddleware, paginationGuard(100, 50), async (req, res, next) => {
   try {
     const { limit, offset } = (req as any).pagination;
@@ -2202,6 +2293,14 @@ R.post('/admin/withdrawals/:txId', authMiddleware, adminMiddleware, async (req, 
   } catch (e: any) { if (e.status) return res.status(e.status).json({ success: false, error: e.message }); next(e); }
 });
 
+// ---------- ADMIN: SETTINGS ----------
+R.get('/admin/settings', authMiddleware, adminMiddleware, async (_req, res, next) => {
+  try {
+    const r = await query('SELECT key,value,updated_at FROM platform_settings ORDER BY key');
+    res.json({ success: true, settings: r.rows });
+  } catch (e) { next(e); }
+});
+
 R.put('/admin/settings/:key', authMiddleware, adminMiddleware, async (req, res, next) => {
   try {
     const { value } = req.body;
@@ -2224,13 +2323,48 @@ R.put('/admin/settings/:key', authMiddleware, adminMiddleware, async (req, res, 
   } catch (e) { next(e); }
 });
 
-R.get('/admin/settings', authMiddleware, adminMiddleware, async (_req, res, next) => {
+R.put('/admin/wallet/set', authMiddleware, adminMiddleware, async (req, res, next) => {
   try {
-    const r = await query('SELECT key,value,updated_at FROM platform_settings ORDER BY key');
-    res.json({ success: true, settings: r.rows });
+    const { address, chain_id } = req.body;
+    if (!address || typeof address !== 'string' || !ethers.isAddress(address))
+      return res.status(400).json({ success: false, error: 'INVALID_ADDRESS' });
+    const before = await query(`SELECT value FROM platform_settings WHERE key='admin_wallet'`);
+    const value = { address: address.toLowerCase(), chain_id: chain_id || 56 };
+    await query(
+      `INSERT INTO platform_settings (key,value,updated_at) VALUES ('admin_wallet',$1,NOW())
+       ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
+      [JSON.stringify(value)]);
+    invalidateSetting('admin_wallet');
+    await writeAudit({
+      adminId: (req as any).user.id, adminEmail: (req as any).user.email,
+      action: 'wallet.update', targetType: 'setting', targetId: null,
+      before: before.rows[0]?.value, after: value, ip: req.ip, ua: req.header('user-agent') || '',
+    });
+    res.json({ success: true, wallet: value });
   } catch (e) { next(e); }
 });
 
+R.put('/admin/referral-rates/set', authMiddleware, adminMiddleware, async (req, res, next) => {
+  try {
+    const { rates } = req.body;
+    if (!rates || typeof rates !== 'object')
+      return res.status(400).json({ success: false, error: 'INVALID_RATES' });
+    const before = await query(`SELECT value FROM platform_settings WHERE key='package_rates'`);
+    await query(
+      `INSERT INTO platform_settings (key,value,updated_at) VALUES ('package_rates',$1,NOW())
+       ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()`,
+      [JSON.stringify(rates)]);
+    invalidateSetting('package_rates');
+    await writeAudit({
+      adminId: (req as any).user.id, adminEmail: (req as any).user.email,
+      action: 'referral_rates.update', targetType: 'setting', targetId: null,
+      before: before.rows[0]?.value, after: rates, ip: req.ip, ua: req.header('user-agent') || '',
+    });
+    res.json({ success: true, rates });
+  } catch (e) { next(e); }
+});
+
+// ---------- ADMIN: GAMES ----------
 R.post('/admin/games/:game/toggle', authMiddleware, adminMiddleware, async (req, res, next) => {
   try {
     const game = req.params.game;
@@ -2249,57 +2383,6 @@ R.post('/admin/games/:game/toggle', authMiddleware, adminMiddleware, async (req,
       ip: req.ip, ua: req.header('user-agent') || '',
     });
     res.json({ success: true, games: cfg });
-  } catch (e) { next(e); }
-});
-
-R.get('/admin/audit', authMiddleware, adminMiddleware, paginationGuard(100, 50), async (req, res, next) => {
-  try {
-    const { limit, offset } = (req as any).pagination;
-    const action = (req.query.action as string) || '';
-    const r = await query(
-      `SELECT a.id,a.admin_email,a.action,a.target_type,a.target_id,
-              a.before_state,a.after_state,a.ip_address,a.created_at
-       FROM audit_log a
-       WHERE ($1 = '' OR a.action ILIKE '%'||$1||'%')
-       ORDER BY a.created_at DESC LIMIT $2 OFFSET $3`,
-      [action, limit, offset]);
-    res.json({ success: true, logs: r.rows });
-  } catch (e) { next(e); }
-});
-
-R.post('/admin/lottery/draw', authMiddleware, adminMiddleware, async (req, res, next) => {
-  try {
-    const { roundId } = req.body;
-    const r = await drawWeeklyLottery(roundId);
-    await writeAudit({
-      adminId: (req as any).user.id, adminEmail: (req as any).user.email,
-      action: 'lottery.draw', targetType: 'lottery_round', targetId: roundId,
-      before: null, after: r, ip: req.ip, ua: req.header('user-agent') || '',
-    });
-    res.json({ success: true, ...r });
-  } catch (e: any) { if (e.status) return res.status(e.status).json({ success: false, error: e.message }); next(e); }
-});
-
-R.post('/admin/lottery/create-round', authMiddleware, adminMiddleware, async (req, res, next) => {
-  try {
-    const { endAt, ticketPrice } = req.body;
-    if (!endAt) return res.status(400).json({ success: false, error: 'END_AT_REQUIRED' });
-    const last = await query(`SELECT COALESCE(MAX(round_number),0) AS n FROM weekly_lottery_rounds`);
-    const nextN = Number(last.rows[0].n) + 1;
-    const r = await query(
-      `INSERT INTO weekly_lottery_rounds (round_number, start_at, end_at, ticket_price, is_admin_controlled)
-       VALUES ($1, NOW(), $2, $3, TRUE) RETURNING *`,
-      [nextN, endAt, Number(ticketPrice) || 5]);
-    res.json({ success: true, round: r.rows[0] });
-  } catch (e) { next(e); }
-});
-
-R.post('/admin/lottery/force-draw', authMiddleware, adminMiddleware, async (req, res, next) => {
-  try {
-    const r = await query(`SELECT id FROM weekly_lottery_rounds WHERE status='open' ORDER BY round_number DESC LIMIT 1`);
-    if (!r.rowCount) return res.status(404).json({ success: false, error: 'NO_OPEN_ROUND' });
-    const result = await drawWeeklyLottery(r.rows[0].id);
-    res.json({ success: true, ...result });
   } catch (e) { next(e); }
 });
 
@@ -2355,6 +2438,7 @@ R.put('/admin/games/:game/limits', authMiddleware, adminMiddleware, async (req, 
   } catch (e) { next(e); }
 });
 
+// ---------- ADMIN: POOLS ----------
 R.get('/admin/pools', authMiddleware, adminMiddleware, async (_req, res, next) => {
   try {
     const r = await query(`SELECT * FROM game_pools ORDER BY game`);
@@ -2376,6 +2460,60 @@ R.post('/admin/pools/:game/reset', authMiddleware, adminMiddleware, async (req, 
   } catch (e) { next(e); }
 });
 
+// ---------- ADMIN: LOTTERY ----------
+R.post('/admin/lottery/draw', authMiddleware, adminMiddleware, async (req, res, next) => {
+  try {
+    const { roundId } = req.body;
+    const r = await drawWeeklyLottery(roundId);
+    await writeAudit({
+      adminId: (req as any).user.id, adminEmail: (req as any).user.email,
+      action: 'lottery.draw', targetType: 'lottery_round', targetId: roundId,
+      before: null, after: r, ip: req.ip, ua: req.header('user-agent') || '',
+    });
+    res.json({ success: true, ...r });
+  } catch (e: any) { if (e.status) return res.status(e.status).json({ success: false, error: e.message }); next(e); }
+});
+
+R.post('/admin/lottery/create-round', authMiddleware, adminMiddleware, async (req, res, next) => {
+  try {
+    const { endAt, ticketPrice } = req.body;
+    if (!endAt) return res.status(400).json({ success: false, error: 'END_AT_REQUIRED' });
+    const last = await query(`SELECT COALESCE(MAX(round_number),0) AS n FROM weekly_lottery_rounds`);
+    const nextN = Number(last.rows[0].n) + 1;
+    const r = await query(
+      `INSERT INTO weekly_lottery_rounds (round_number, start_at, end_at, ticket_price, is_admin_controlled)
+       VALUES ($1, NOW(), $2, $3, TRUE) RETURNING *`,
+      [nextN, endAt, Number(ticketPrice) || 5]);
+    res.json({ success: true, round: r.rows[0] });
+  } catch (e) { next(e); }
+});
+
+R.post('/admin/lottery/force-draw', authMiddleware, adminMiddleware, async (req, res, next) => {
+  try {
+    const r = await query(`SELECT id FROM weekly_lottery_rounds WHERE status='open' ORDER BY round_number DESC LIMIT 1`);
+    if (!r.rowCount) return res.status(404).json({ success: false, error: 'NO_OPEN_ROUND' });
+    const result = await drawWeeklyLottery(r.rows[0].id);
+    res.json({ success: true, ...result });
+  } catch (e) { next(e); }
+});
+
+// ---------- ADMIN: AUDIT ----------
+R.get('/admin/audit', authMiddleware, adminMiddleware, paginationGuard(100, 50), async (req, res, next) => {
+  try {
+    const { limit, offset } = (req as any).pagination;
+    const action = (req.query.action as string) || '';
+    const r = await query(
+      `SELECT a.id,a.admin_email,a.action,a.target_type,a.target_id,
+              a.before_state,a.after_state,a.ip_address,a.created_at
+       FROM audit_log a
+       WHERE ($1 = '' OR a.action ILIKE '%'||$1||'%')
+       ORDER BY a.created_at DESC LIMIT $2 OFFSET $3`,
+      [action, limit, offset]);
+    res.json({ success: true, logs: r.rows });
+  } catch (e) { next(e); }
+});
+
+// ---------- ADMIN: NOTIFICATIONS ----------
 R.post('/admin/notifications/broadcast', authMiddleware, adminMiddleware, async (req, res, next) => {
   try {
     const { title, body, type = 'info', category = 'general' } = req.body;
@@ -2395,6 +2533,7 @@ R.post('/admin/notifications/broadcast', authMiddleware, adminMiddleware, async 
   } catch (e) { next(e); }
 });
 
+// ---------- ADMIN: DEPOSIT UTILS ----------
 R.post('/admin/deposit/refresh', authMiddleware, adminMiddleware, async (_req, res, next) => {
   try { res.json({ success: true, refreshed: await refreshPendingDeposits() }); }
   catch (e) { next(e); }
@@ -2491,11 +2630,6 @@ const autoCloseCompetitions = async () => {
     `UPDATE competitions SET status='awaiting_draw'
      WHERE status='open' AND end_at <= NOW() RETURNING id`);
   if (r.rowCount) logger.info({ count: r.rowCount }, '⏰ Competitions closed');
-};
-
-const autoDrawWeeklyLottery = async () => {
-  // الآن يدوي - لا سحب تلقائي
-  return 0;
 };
 
 const cleanupIdempotency = async () => {
